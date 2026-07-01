@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "one-to-many"
+version = "0.1.0"
+description = "Gaussian-Splatting reconstruction of a robot's environment for re-rendering altered end-effector trajectories (one demo -> many)."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pandas",
+    "pyyaml",
+    "opencv-python",
+    "imageio[ffmpeg]",
+    "matplotlib",
+    "tqdm",
+]
+
+# The heavy reconstruction stack is version-sensitive and large, so it is kept
+# in an optional extra. The data/kinematics/render-overlay path works without it.
+[project.optional-dependencies]
+splat = [
+    # Installed/managed separately in practice (CUDA-specific wheels):
+    #   nerfstudio, gsplat, pycolmap
+    # Listed here for documentation; pin in your environment as needed.
+    "nerfstudio",
+    "gsplat",
+    "pycolmap",
+]
+robot = [
+    "mujoco>=3.7.0",
+    "pin",          # pinocchio
+]
+mask = [
+    # Optional learned maskers (Grounded-SAM / SAM2). Pin in your environment.
+    "segment-anything",
+]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+]
+dev = [
+    "pytest",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

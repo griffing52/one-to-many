@@ -1,0 +1,22 @@
+# Top-level pipeline config. Sub-configs are merged in (see `includes`); any key
+# here overrides the same key in an included file.
+includes:
+  - dataset.yaml
+  - camera.yaml
+  - colmap.yaml
+  - splat.yaml
+  - robot.yaml
+
+episode: episode_000
+
+# Where artifacts are written: outputs/<episode>/...
+output_root: ./outputs
+
+# Stages run by scripts/run_pipeline.py, in order.
+stages: [extract, mask, colmap, align, train, render]
+
+render:
+  mode: robot_overlay        # static | robot_overlay | dynamic
+  edit: replay_original      # preset name from trajectory/presets.py
+  viewpoint: zed             # zed | wrist | orbit  (camera to render from)
+  fps: 30

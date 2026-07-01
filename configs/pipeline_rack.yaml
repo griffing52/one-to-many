@@ -1,0 +1,25 @@
+# Reconstruct the textured, mostly-static rack+bag segment (raw frames 0-90) at
+# full rate. This is the segment that reconstructs well (high texture, before the
+# bag is lifted/manipulated), giving a good dataset-framerate matched render.
+includes:
+  - dataset.yaml
+  - camera.yaml
+  - colmap.yaml
+  - splat.yaml
+  - robot.yaml
+
+episode: episode_000
+output_root: ./outputs_rack
+
+dataset:
+  frame_stride: 1
+
+colmap:
+  matcher: sequential
+  use_masks: false
+
+stages: [extract, colmap, train, render]
+
+render:
+  mode: matched
+  fps: 30

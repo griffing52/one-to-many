@@ -1,0 +1,22 @@
+splat:
+  method: splatfacto          # nerfstudio method
+  ns_train_binary: ns-train
+  ns_export_binary: ns-export
+
+  max_num_iterations: 30000   # smoke test: set 2000 via --max-iters
+  sh_degree: 3
+
+  # CRITICAL: keep the splat world frame == COLMAP frame so the robot-base
+  # alignment (sim3) remains valid. Disable nerfstudio auto reframing.
+  dataparser:
+    orientation_method: none
+    center_method: none
+    auto_scale_poses: false
+
+  # Memory safety (this machine co-runs other GPU/RAM-heavy jobs).
+  datamanager:
+    cache_images: cpu         # cpu | gpu
+    cache_images_type: uint8  # uint8 | float32
+
+  export:
+    format: ply               # exported to outputs/<ep>/splat/splat.ply

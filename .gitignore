@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+.python-version
+
+# Project artifacts (large / regenerable)
+data/
+outputs/
+*.ply
+*.mp4
+*.gif
+
+# Reconstruction caches
+**/colmap/database.db
+**/sparse/
+**/nerfstudio/images/
+**/nerfstudio/masks/
+
+# OS / editor
+.DS_Store
+.ipynb_checkpoints/
+.vscode/
+
+# mkdocs build
+site/

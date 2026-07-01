@@ -1,0 +1,31 @@
+robot:
+  # URDF directory (for package:// mesh resolution) and the URDF to load.
+  # The *_v100_camera variant exposes the wrist-camera link (needed for the
+  # FK-based splat<->base alignment) and the gripper finger links.
+  urdf_dir: /home/griffing52/vail/bot2bot/urdf
+  # FK/alignment URDF: the *_camera variant exposes the wrist-camera link.
+  urdf: /home/griffing52/vail/bot2bot/urdf/piper_description/urdf/piper_description_v100_camera.urdf
+  # Render URDF for MuJoCo: STL meshes (the _camera variant's DAE won't decode).
+  render_urdf: /home/griffing52/vail/bot2bot/urdf/piper_description/urdf/piper_description.urdf
+
+  base_frame: base_link
+  ee_frame: null              # null -> auto-guess (link6/flange/tcp)
+  camera_frame: null          # wrist-camera link in the camera URDF variant
+
+  ik:
+    max_iters: 200
+    tol: 1.0e-4
+    damping: 1.0e-6
+    step_size: 0.5
+
+  # Map measured gripper width (m) to the two prismatic finger joints.
+  gripper:
+    joint_names: [joint7, joint8]
+    max_width_m: 0.07
+
+align:
+  method: from_wrist_fk       # from_wrist_fk | from_known_points
+  # Optional extra offset T_camlink<-realcam if the URDF camera link does not
+  # match the physical mount; identity by default.
+  cam_offset_xyz: [0.0, 0.0, 0.0]
+  cam_offset_rpy: [0.0, 0.0, 0.0]

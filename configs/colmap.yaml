@@ -1,0 +1,35 @@
+colmap:
+  # Backend: auto picks the colmap CLI if on PATH, else the pycolmap Python API
+  # (no system install needed). Force with "cli" or "pycolmap".
+  backend_impl: auto
+  binary: colmap            # name of the CLI binary (used only by the cli backend)
+
+  single_camera: true        # all wrist frames share one physical camera
+  matcher: exhaustive        # short sequences + low texture -> exhaustive finds
+                             # more loop closures than sequential. O(N^2) but N small.
+  loop_detection: true
+
+  # Foreground masks: COLMAP ignores pixels where the mask is black (0).
+  # OFF by default: the bundled color/motion masker assumes a STATIONARY camera
+  # and is wrong for the moving wrist cam (it masks the background). Enable only
+  # with a learned masker (SAM/Grounded-SAM) that segments the arm/object.
+  use_masks: false
+  mask_dir_name: masks
+
+  # SIFT extraction tuning for low-texture indoor scenes (matte racks, white
+  # cloth, blank walls). These raise features/image from ~60 to ~300+.
+  sift:
+    peak_threshold: 0.002
+    edge_threshold: 20.0
+    max_num_features: 20000
+    domain_size_pooling: true
+    estimate_affine_shape: true
+
+  mapper:
+    min_num_matches: 15
+    min_track_length: 3
+
+  # Quality gates checked by scripts/03_run_colmap.py.
+  quality:
+    min_registered_fraction: 0.85
+    max_mean_reproj_error_px: 1.5

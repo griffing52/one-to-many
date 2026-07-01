@@ -1,0 +1,67 @@
+# ============================================================================
+# Cheap world model / synthetic-data pipeline config.
+#
+# Used by: scripts/07_synthesize_episode.py  (module: o2m.worldmodel)
+# One recorded episode -> one perturbed, IK-verified, dual-view synthetic episode
+# written back in the INPUT dataset format (actions.csv + realsense_color/ +
+# zed_color/). Edit the knobs below; every field is read in scripts/07.
+# ============================================================================
+worldmodel:
+  # ---- inputs / provenance -------------------------------------------------
+  episode: episode_000
+  # Recorded dataset root (episode_NNN live here). Matches configs/dataset.yaml.
+  data_root: /home/griffing52/vail/bot2bot/bot2bot/a2l/agilex_data_collection/pick_bag_joe
+
+  # ZED third-person camera calibrated into the robot BASE frame (target-free PnP
+  # on the green gripper, ~7px). npz with keys c2w (4x4) and K (3x3).
+  zed_extrinsic_npz: ./outputs/episode_000/align/zed_extrinsic.npz
+  # Real ZED "clean plate": the scene with the robot inpainted out (SAM mask).
+  clean_plate: ./outputs/episode_000/renders/worldmodel/clean_plate_sam.png
+
+  # ---- wrist (RealSense) intrinsics ---------------------------------------
+  wrist_intrinsics: {fx: 465.0, fy: 465.0, cx: 320.0, cy: 240.0, width: 640, height: 480}
+
+  # ---- perturbation --------------------------------------------------------
+  perturb:
+    name: left_up_4_2cm
+    # Peak EE offset (metres, robot base frame). +y = robot-left, +z = up.
+    # Applied during the approach and converged to 0 at the grasp frame.
+    base_offset: [0.0, 0.04, 0.02]
+    # converge_at_grasp : offset during approach, 0 at grasp & after (RECOMMENDED,
+    #                     matches "reach the correct spot, then end the same way").
+    # constant          : rigid base shift for whole episode (pure failure sim).
+    envelope: converge_at_grasp
+    # null -> auto-detect the grasp frame from the gripper-closing edge.
+    grasp_frame: null
+    # IK residual threshold (m/rad). All frames below it -> label "success".
+    ik_tol: 5.0e-3
+
+  # ---- gripper fixed-mask trapezoid (wrist warp) --------------------------
+  # The wrist gripper is rigid to the camera; its pixels are kept from the
+  # ORIGINAL frame (not warped) inside a bottom-centre trapezoid.
+  # NOTE: halved width vs the first version (half_top 0.10->0.05, grow 0.35->0.175).
+  gripper_mask:
+    y_start_frac: 0.70     # trapezoid top, fraction down the image
+    half_top: 0.05         # half-width at the top edge (fraction of image width)
+    half_grow: 0.175       # extra half-width added by the bottom edge
+
+  # ---- warp quality --------------------------------------------------------
+  warp:
+    kernel_splat: true     # 2x2 forward splat -> fewer pin-holes / less spray
+    inpaint_holes: true    # TELEA inpaint remaining disocclusion holes
+
+  # ---- render toggles / range ---------------------------------------------
+  render_wrist: true
+  render_zed: true
+  # [start, end) frame range to synthesise; null = full episode.
+  frame_range: null
+
+  # ---- output --------------------------------------------------------------
+  # Synthetic episodes are written here, one subdir per perturbation, in the
+  # SAME format as the input dataset (drop-in for the LeRobot converter).
+  output_root: ./outputs/episode_000/synthetic
+
+# robot.* (urdf paths, frames) are inherited from configs/robot.yaml when this
+# file is loaded through the shared config loader.
+includes:
+  - robot.yaml

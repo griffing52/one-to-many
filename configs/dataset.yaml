@@ -1,0 +1,21 @@
+dataset:
+  # Root containing episode_NNN/ folders.
+  data_root: /home/griffing52/vail/bot2bot/bot2bot/a2l/agilex_data_collection/pick_bag_joe
+
+  # Camera subdirectory names inside each episode.
+  cameras:
+    wrist: realsense_color   # 640x480, moving  -> used for COLMAP/splat
+    zed: zed_color           # 1280x720, static -> render/overlay viewpoint
+
+  # Use only every k-th wrist frame for reconstruction (1 = all frames).
+  frame_stride: 4
+
+  # EE/action loading conventions (see src/o2m/data/actions.py).
+  arm: slave                 # slave | master  (training uses slave)
+  ee_source: ee              # ee (slave_ee_*) | fk (slave_fk_*)
+
+  # Unit constants documented for reference; matches the LeRobot converter.
+  units:
+    pos_001mm_to_m: 1.0e-6
+    rot_001deg_to_rad: 1.7453292519943295e-05   # pi/180/1000
+    gripper_001mm_to_m: 1.0e-6

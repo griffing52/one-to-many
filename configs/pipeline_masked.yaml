@@ -1,0 +1,23 @@
+# Variant of pipeline.yaml that masks the gripper (ROI) and uses masks in COLMAP
+# + splat training. Writes to a separate output_root so the unmasked baseline is
+# preserved for side-by-side comparison.
+includes:
+  - dataset.yaml
+  - camera.yaml
+  - colmap.yaml
+  - splat.yaml
+  - robot.yaml
+
+episode: episode_000
+output_root: ./outputs_masked
+
+stages: [extract, mask, colmap, train, render]
+
+colmap:
+  use_masks: true        # exclude the gripper region from SfM + carry into training
+
+render:
+  mode: static
+  edit: replay_original
+  viewpoint: wrist
+  fps: 30

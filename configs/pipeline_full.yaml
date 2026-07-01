@@ -1,0 +1,26 @@
+# Clean full-rate pipeline: every recorded frame (stride 1), sequential matching
+# (adjacent frames overlap strongly), separate output_root so the stride-4
+# baseline is preserved. Enables the dataset-framerate matched render with exact
+# (not interpolated) poses wherever frames register.
+includes:
+  - dataset.yaml
+  - camera.yaml
+  - colmap.yaml
+  - splat.yaml
+  - robot.yaml
+
+episode: episode_000
+output_root: ./outputs_full
+
+dataset:
+  frame_stride: 1
+
+colmap:
+  matcher: sequential   # dense video -> sequential is faster & registers more
+  use_masks: false
+
+stages: [extract, colmap, train, render]
+
+render:
+  mode: matched
+  fps: 30

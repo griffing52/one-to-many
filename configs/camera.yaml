@@ -1,0 +1,26 @@
+camera:
+  # COLMAP camera model for the wrist camera. OPENCV estimates distortion.
+  colmap_model: OPENCV
+
+  # Wrist camera (RealSense D435i, 640x480). Priors seed COLMAP; refined by SfM.
+  wrist:
+    width: 640
+    height: 480
+    # RealSense D435i RGB ~69 deg HFOV @ 640 wide -> fx ~= 465 (refined by COLMAP).
+    fx_prior: 465.0
+    fy_prior: 465.0
+    cx_prior: 320.0
+    cy_prior: 240.0
+
+  # Stationary third-person camera (ZED2, 1280x720). Used as the render
+  # viewpoint for robot_overlay. Extrinsic is registered into the splat frame
+  # (see align/ and pipeline/06_robot_overlay).
+  zed:
+    width: 1280
+    height: 720
+    fx_prior: 700.0
+    fy_prior: 700.0
+    cx_prior: 640.0
+    cy_prior: 360.0
+    # If known, set the vertical FOV (deg) for MuJoCo overlay rendering.
+    fovy_deg: null
