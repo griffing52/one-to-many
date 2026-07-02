@@ -11,8 +11,8 @@ from .perturb import (PerturbationSpec, PerturbedTrajectory, check_feasibility,
 from .pipeline import SyntheticEpisodePipeline, WorldModelConfig
 from .synth import write_synthetic_episode
 from .thirdperson import ThirdPersonRenderer, load_zed_camera
-from .wrist_warp import (GripperMask, WristIntrinsics, WristWarper,
-                         base_offset_to_camera, disparity_to_depth)
+from .wrist_warp import (FILL_METHODS, GripperMask, WristIntrinsics, WristWarper,
+                         base_offset_to_camera, disparity_to_depth, fill_holes)
 
 __all__ = [
     "PerturbationSpec", "PerturbedTrajectory", "perturb_trajectory",
@@ -20,6 +20,6 @@ __all__ = [
     "SyntheticEpisodePipeline", "WorldModelConfig",
     "write_synthetic_episode",
     "ThirdPersonRenderer", "load_zed_camera",
-    "GripperMask", "WristIntrinsics", "WristWarper",
-    "base_offset_to_camera", "disparity_to_depth",
+    "GripperMask", "WristIntrinsics", "WristWarper", "FILL_METHODS",
+    "base_offset_to_camera", "disparity_to_depth", "fill_holes",
 ]

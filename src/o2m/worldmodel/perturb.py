@@ -47,7 +47,7 @@ def detect_grasp_frame(gripper_width: np.ndarray) -> int:
 class PerturbationSpec:
     """One perturbation. ``base_offset`` is the peak EE offset (m, base frame)."""
     base_offset: Tuple[float, float, float] = (0.0, 0.04, 0.02)
-    envelope: str = "converge_at_grasp"   # converge_at_grasp | constant
+    envelope: str = "bump"   # bump | converge_at_grasp | constant
     grasp_frame: Optional[int] = None     # None -> auto-detect from gripper
     name: str = "perturb"
 
@@ -55,15 +55,24 @@ class PerturbationSpec:
 def offset_envelope(n_frames: int, grasp_frame: int, kind: str) -> np.ndarray:
     """Per-frame scalar weight w(t) in [0,1] multiplying ``base_offset``.
 
+    - ``bump`` *(recommended)*: w=0 at t=0, smoothly up to 1 in the middle of the
+      approach, back to 0 at the grasp frame, and 0 after. Both runs **start
+      identically** (home pose) and reach the **same grasp** — the trajectory only
+      deviates mid-reach. This is the "start and end aligned, shifted along the way"
+      behaviour (a raised-cosine hump over [0, grasp]).
     - ``converge_at_grasp``: w=1 at t=0, smoothly -> 0 at the grasp frame, and 0
-      afterwards. The approach is offset; the grasp and everything after it match
-      the original (so it reaches the bag and ends the same way).
-    - ``constant``: w=1 everywhere (a rigid base shift; useful for pure failure
-      simulation where the arm never corrects).
+      afterwards. The approach starts at the **full** offset (the two runs start
+      *differently*) and converges to the same grasp.
+    - ``constant``: w=1 everywhere (a rigid base shift; pure failure simulation).
     """
     t = np.arange(n_frames)
     if kind == "constant":
         return np.ones(n_frames)
+    if kind == "bump":
+        gf = max(1, int(grasp_frame))
+        w = np.sin(np.pi * np.clip(t / gf, 0.0, 1.0)) ** 2   # 0 at t=0 & t=gf, 1 at gf/2
+        w[t >= gf] = 0.0
+        return w
     if kind == "converge_at_grasp":
         gf = max(1, int(grasp_frame))
         w = smootherstep((gf - t) / gf)   # 1 at t=0 -> 0 at t=gf

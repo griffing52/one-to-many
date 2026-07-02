@@ -27,10 +27,12 @@ worldmodel:
     # Peak EE offset (metres, robot base frame). +y = robot-left, +z = up.
     # Applied during the approach and converged to 0 at the grasp frame.
     base_offset: [0.0, 0.04, 0.02]
-    # converge_at_grasp : offset during approach, 0 at grasp & after (RECOMMENDED,
-    #                     matches "reach the correct spot, then end the same way").
+    # bump              : 0 at t=0, up to peak mid-approach, 0 at grasp & after
+    #                     (RECOMMENDED). Both runs START identically (home pose) and
+    #                     reach the SAME grasp; only the mid-reach deviates.
+    # converge_at_grasp : FULL offset at t=0, 0 at grasp & after (starts displaced).
     # constant          : rigid base shift for whole episode (pure failure sim).
-    envelope: converge_at_grasp
+    envelope: bump
     # null -> auto-detect the grasp frame from the gripper-closing edge.
     grasp_frame: null
     # IK residual threshold (m/rad). All frames below it -> label "success".
@@ -45,10 +47,27 @@ worldmodel:
     half_top: 0.05         # half-width at the top edge (fraction of image width)
     half_grow: 0.175       # extra half-width added by the bottom edge
 
-  # ---- warp quality --------------------------------------------------------
+  # ---- wrist renderer + warp quality --------------------------------------
+  # depthwarp : reproject the real frame by depth (fast, real detail).
+  # genwarp   : Sony GenWarp diffusion novel-view synthesis (clean disocclusions,
+  #             needs a GPU + checkpoints; see docs/genwarp.md).
+  wrist_renderer: depthwarp
   warp:
     kernel_splat: true     # 2x2 forward splat -> fewer pin-holes / less spray
-    inpaint_holes: true    # TELEA inpaint remaining disocclusion holes
+    inpaint_holes: true    # master switch for hole filling (false = leave holes)
+    # Hole-fill strategy for the disocclusion gaps (depthwarp path):
+    #   none | nearest | bilinear | edge_aware | inpaint
+    # Compare them all with scripts/09_fill_methods_demo.py.
+    fill_method: inpaint
+
+  # ---- GenWarp knobs (only used when wrist_renderer: genwarp) --------------
+  # GenWarp shares the same DA-v2 depth + camera offset as the depth-warp; these
+  # tune only the generative novel-view synthesis. See docs/genwarp.md.
+  genwarp:
+    mode: pad              # pad (full frame, recommended) | crop | squash
+    depth_scale: 1.0       # <1 exaggerates the shift, >1 shrinks it (parallax ~ 1/depth)
+    num_inference_steps: 20  # more -> cleaner, slower
+    guidance_scale: 3.5    # higher -> follows the warp more (less drift)
 
   # ---- render toggles / range ---------------------------------------------
   render_wrist: true

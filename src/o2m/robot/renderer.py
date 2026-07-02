@@ -29,13 +29,23 @@ def _camera_quat_wxyz(c2w: np.ndarray):
 
 
 def build_mujoco_with_camera(urdf: Path, urdf_dir: Path, camera: Camera):
-    """Compile a MuJoCo model with a fixed exact camera named ``o2m_cam``."""
+    """Compile a MuJoCo model with a fixed exact camera named ``o2m_cam``.
+
+    Accepts either a URDF (STL/OBJ meshes via ``package://``) or a native MuJoCo
+    ``.xml`` (MJCF). The MJCF path is how we get the *coloured* arm: MuJoCo's URDF
+    importer keeps only one ``<visual>`` per link, so multi-material colour needs
+    the MJCF, which allows many mesh geoms per body (see
+    ``piper_description_color.xml``). Meshes in the MJCF resolve via its ``meshdir``.
+    """
     import mujoco
     ensure_on_path()
-    from cross_embodiment.mujoco_scene import load_urdf_with_assets
 
-    xml, assets = load_urdf_with_assets(Path(urdf_dir), Path(urdf))
-    spec = mujoco.MjSpec.from_string(xml, assets=assets)
+    if Path(urdf).suffix.lower() in (".xml", ".mjcf"):
+        spec = mujoco.MjSpec.from_file(str(urdf))
+    else:
+        from cross_embodiment.mujoco_scene import load_urdf_with_assets
+        xml, assets = load_urdf_with_assets(Path(urdf_dir), Path(urdf))
+        spec = mujoco.MjSpec.from_string(xml, assets=assets)
     spec.visual.global_.offwidth = max(int(spec.visual.global_.offwidth), camera.width)
     spec.visual.global_.offheight = max(int(spec.visual.global_.offheight), camera.height)
     cam = spec.worldbody.add_camera()

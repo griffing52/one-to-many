@@ -54,6 +54,12 @@ class WorldModelConfig:
     ik_tol: float = 5e-3
     kernel_splat: bool = True
     inpaint_holes: bool = True
+    fill_method: str = "inpaint"       # none|nearest|bilinear|edge_aware|inpaint
+    wrist_renderer: str = "depthwarp"  # depthwarp | genwarp
+    genwarp_mode: str = "pad"          # pad | crop | squash
+    genwarp_depth_scale: float = 1.0   # <1 exaggerates the shift, >1 shrinks it
+    genwarp_steps: int = 20
+    genwarp_guidance: float = 3.5
     frame_range: Optional[Tuple[int, int]] = None
     render_wrist: bool = True
     render_zed: bool = True
@@ -104,21 +110,35 @@ class SyntheticEpisodePipeline:
         cam_R = [model.fk(meas_joints[i], [cfg.camera_frame])[cfg.camera_frame][:3, :3]
                  for i in idx]
 
-        # 4a. wrist view (depth-warp) --------------------------------------
+        # 4a. wrist view (depth-warp OR genwarp) ---------------------------
         wrist_frames: List[np.ndarray] = []
         if cfg.render_wrist:
             warper = WristWarper(cfg.wrist_intr, cfg.gripper_mask,
                                  kernel_splat=cfg.kernel_splat,
-                                 inpaint_holes=cfg.inpaint_holes)
+                                 inpaint_holes=cfg.inpaint_holes,
+                                 fill_method=cfg.fill_method)
+            gw = None
+            if cfg.wrist_renderer == "genwarp":
+                from .genwarp_warp import GenWarpWrapper
+                gw = GenWarpWrapper(num_inference_steps=cfg.genwarp_steps,
+                                    guidance_scale=cfg.genwarp_guidance)
+                gmask = cfg.gripper_mask.mask(cfg.wrist_intr.height, cfg.wrist_intr.width)
             wrist_paths = ep.wrist_frames()
             for k, i in enumerate(idx):
                 real = np.asarray(Image.open(wrist_paths[i]).convert("RGB"))
                 depth = disparity_to_depth(self.mono.estimate(real))
                 dcam = base_offset_to_camera(pert.offsets[i], cam_R[k])
-                wrist_frames.append(warper.warp(real, depth, dcam))
+                if gw is not None:
+                    frame = gw.warp(real, depth, dcam, cfg.wrist_intr.fy,
+                                    mode=cfg.genwarp_mode,
+                                    depth_scale=cfg.genwarp_depth_scale)
+                    frame[gmask] = real[gmask]     # keep the gripper fixed
+                    wrist_frames.append(frame)
+                else:
+                    wrist_frames.append(warper.warp(real, depth, dcam))
                 if k % 40 == 0:
-                    log.info("  wrist warp %d/%d (|dcam|=%.3fm)", k, len(idx),
-                             float(np.linalg.norm(dcam)))
+                    log.info("  wrist %s %d/%d (|dcam|=%.3fm)", cfg.wrist_renderer,
+                             k, len(idx), float(np.linalg.norm(dcam)))
 
         # 4b. third-person view (robot over clean plate) -------------------
         zed_frames: List[np.ndarray] = []

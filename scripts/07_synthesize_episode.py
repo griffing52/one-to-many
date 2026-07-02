@@ -47,13 +47,17 @@ def main() -> None:
     ap.add_argument("--episode", default=None, help="Override worldmodel.episode.")
     ap.add_argument("--offset", type=float, nargs=3, default=None,
                     metavar=("DX", "DY", "DZ"), help="Override base_offset (m).")
-    ap.add_argument("--envelope", default=None, choices=["converge_at_grasp", "constant"])
+    ap.add_argument("--envelope", default=None,
+                    choices=["bump", "converge_at_grasp", "constant"])
     ap.add_argument("--grasp-frame", type=int, default=None)
     ap.add_argument("--name", default=None, help="Perturbation name -> output subdir.")
     ap.add_argument("--frames", type=int, nargs=2, default=None,
                     metavar=("START", "END"), help="Frame range [start, end).")
     ap.add_argument("--no-wrist", action="store_true")
     ap.add_argument("--no-zed", action="store_true")
+    ap.add_argument("--wrist-renderer", default=None, choices=["depthwarp", "genwarp"])
+    ap.add_argument("--fill-method", default=None,
+                    choices=["none", "nearest", "bilinear", "edge_aware", "inpaint"])
     args = ap.parse_args()
 
     cfg = Config.from_yaml(args.config)
@@ -66,13 +70,14 @@ def main() -> None:
     p = wm["perturb"]
     spec = PerturbationSpec(
         base_offset=tuple(args.offset if args.offset is not None else p["base_offset"]),
-        envelope=args.envelope or p.get("envelope", "converge_at_grasp"),
+        envelope=args.envelope or p.get("envelope", "bump"),
         grasp_frame=args.grasp_frame if args.grasp_frame is not None else p.get("grasp_frame"),
         name=args.name or p.get("name", "perturb"))
 
     wi = wm["wrist_intrinsics"]
     gm = wm["gripper_mask"]
     warp = wm.get("warp", {})
+    gwc = wm.get("genwarp", {})
     fr = args.frames if args.frames is not None else wm.get("frame_range")
 
     wmc = WorldModelConfig(
@@ -94,6 +99,12 @@ def main() -> None:
         ik_tol=float(p.get("ik_tol", 5e-3)),
         kernel_splat=bool(warp.get("kernel_splat", True)),
         inpaint_holes=bool(warp.get("inpaint_holes", True)),
+        fill_method=args.fill_method or warp.get("fill_method", "inpaint"),
+        wrist_renderer=args.wrist_renderer or wm.get("wrist_renderer", "depthwarp"),
+        genwarp_mode=gwc.get("mode", "pad"),
+        genwarp_depth_scale=float(gwc.get("depth_scale", 1.0)),
+        genwarp_steps=int(gwc.get("num_inference_steps", 20)),
+        genwarp_guidance=float(gwc.get("guidance_scale", 3.5)),
         frame_range=tuple(fr) if fr else None,
         render_wrist=wm.get("render_wrist", True) and not args.no_wrist,
         render_zed=wm.get("render_zed", True) and not args.no_zed,

@@ -63,6 +63,42 @@ def disparity_to_depth(disp: np.ndarray) -> np.ndarray:
     return d * (0.5 / np.median(d))
 
 
+# Hole-fill strategies for the disocclusion gaps left by forward warping. All take
+# the scattered image and a boolean ``filled`` mask (True where a pixel got a value)
+# and return the completed image. Pick via ``WristWarper(fill_method=...)`` or
+# compare them all with ``scripts/09_fill_methods_demo.py``.
+FILL_METHODS = ("none", "nearest", "bilinear", "edge_aware", "inpaint", "telea", "ns")
+
+
+def fill_holes(img: np.ndarray, filled: np.ndarray, method: str = "inpaint") -> np.ndarray:
+    """Fill ``~filled`` pixels of ``img`` using ``method`` (see :data:`FILL_METHODS`)."""
+    holes = ~filled
+    if method == "none" or not holes.any():
+        return img
+    if method == "nearest":
+        from scipy import ndimage
+        idx = ndimage.distance_transform_edt(holes, return_distances=False,
+                                             return_indices=True)
+        return img[tuple(idx)]
+    if method == "bilinear":
+        from scipy.interpolate import griddata
+        ys, xs = np.nonzero(filled)
+        pts = np.stack([ys, xs], 1)
+        qy, qx = np.nonzero(holes)
+        out = img.copy()
+        vals = griddata(pts, img[ys, xs], (qy, qx), method="linear")
+        nn = griddata(pts, img[ys, xs], (qy, qx), method="nearest")  # convex-hull gaps
+        vals = np.where(np.isnan(vals), nn, vals)
+        out[qy, qx] = np.clip(vals, 0, 255).astype(img.dtype)
+        return out
+    # OpenCV inpainting variants
+    import cv2
+    mask = holes.astype(np.uint8) * 255
+    if method in ("edge_aware", "ns"):
+        return cv2.inpaint(img, mask, 3, cv2.INPAINT_NS)       # Navier-Stokes (edge-aware)
+    return cv2.inpaint(img, mask, 3, cv2.INPAINT_TELEA)        # fast-marching ("small inpaint")
+
+
 def base_offset_to_camera(delta_world: np.ndarray, cam_R_base: np.ndarray) -> np.ndarray:
     """Base-frame EE offset -> optical camera-frame offset (x right, y down, z fwd).
 
@@ -73,21 +109,36 @@ def base_offset_to_camera(delta_world: np.ndarray, cam_R_base: np.ndarray) -> np
 
 class WristWarper:
     def __init__(self, intr: WristIntrinsics, gripper_mask: GripperMask,
-                 kernel_splat: bool = True, inpaint_holes: bool = True):
+                 kernel_splat: bool = True, inpaint_holes: bool = True,
+                 fill_method: str = "inpaint"):
         self.intr = intr
         self.gmask = gripper_mask
         self.kernel_splat = kernel_splat
-        self.inpaint_holes = inpaint_holes
+        # Back-compat: inpaint_holes=False forces no fill regardless of fill_method.
+        self.fill_method = fill_method if inpaint_holes else "none"
+
+    def scatter(self, real_rgb: np.ndarray, depth: np.ndarray, dcam: np.ndarray):
+        """Forward-warp only: returns (scattered rgb, filled bool mask). No fill/gripper."""
+        return self._scatter(real_rgb, depth, dcam)
 
     def warp(self, real_rgb: np.ndarray, depth: np.ndarray,
-             dcam: np.ndarray) -> np.ndarray:
+             dcam: np.ndarray, fill_method: str = None) -> np.ndarray:
         """Warp ``real_rgb`` as if the camera moved by ``dcam`` (optical frame).
 
         Args:
             real_rgb: HxWx3 uint8 original wrist frame.
             depth: HxW positive depth (from :func:`disparity_to_depth`).
             dcam: (3,) optical-frame camera translation (m).
+            fill_method: override the instance hole-fill strategy for this call.
         """
+        out, filled = self._scatter(real_rgb, depth, dcam)
+        out = fill_holes(out, filled, fill_method or self.fill_method)
+        # Keep the gripper exactly where it was in the original frame.
+        gm = self.gmask.mask(*depth.shape)
+        out[gm] = real_rgb[gm]
+        return out
+
+    def _scatter(self, real_rgb: np.ndarray, depth: np.ndarray, dcam: np.ndarray):
         intr = self.intr
         h, w = depth.shape
         ys, xs = np.mgrid[0:h, 0:w]
@@ -122,20 +173,4 @@ class WristWarper:
             zbuf[iv, iu] = zc[closer]
             out[iv, iu] = col
             filled[iv, iu] = True
-
-        if self.inpaint_holes:
-            out = self._inpaint(out, filled)
-
-        # Keep the gripper exactly where it was in the original frame.
-        gm = self.gmask.mask(h, w)
-        out[gm] = real_rgb[gm]
-        return out
-
-    @staticmethod
-    def _inpaint(img: np.ndarray, filled: np.ndarray) -> np.ndarray:
-        try:
-            import cv2
-            holes = (~filled).astype(np.uint8) * 255
-            return cv2.inpaint(img, holes, 3, cv2.INPAINT_TELEA)
-        except Exception:
-            return img
+        return out, filled
