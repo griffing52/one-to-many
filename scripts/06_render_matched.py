@@ -59,6 +59,9 @@ def main() -> None:
     p.add_argument("--fps", type=int, default=None, help="Override dataset fps.")
     p.add_argument("--full-range", action="store_true",
                    help="Render all recorded frames (freezes outside the registered span).")
+    p.add_argument("--range", type=int, nargs=2, default=None, metavar=("START", "END"),
+                   help="Render only raw frames [START, END] (inclusive). Overrides the "
+                        "default registered span; poses still interpolate from all keyframes.")
     p.add_argument("--map", choices=["frame_index", "hash"], default="frame_index",
                    help="How to map registered frames to raw indices. 'hash' is "
                         "robust to a stale/corrupt frame_index.json.")
@@ -105,6 +108,8 @@ def main() -> None:
     lo, hi = int(key_raw.min()), int(key_raw.max())
     if args.full_range:
         lo, hi = 0, len(raw_frames) - 1
+    if args.range:
+        lo, hi = int(args.range[0]), min(int(args.range[1]), len(raw_frames) - 1)
     raw_frames = raw_frames[lo:hi + 1]
     query = np.arange(lo, hi + 1)
     poses = interpolate_c2w(key_raw, key_c2w, query)

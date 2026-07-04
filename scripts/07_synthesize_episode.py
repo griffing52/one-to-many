@@ -55,7 +55,9 @@ def main() -> None:
                     metavar=("START", "END"), help="Frame range [start, end).")
     ap.add_argument("--no-wrist", action="store_true")
     ap.add_argument("--no-zed", action="store_true")
-    ap.add_argument("--wrist-renderer", default=None, choices=["depthwarp", "genwarp"])
+    ap.add_argument("--wrist-renderer", default=None,
+                    choices=["depthwarp", "genwarp", "mvgen"])
+    ap.add_argument("--depth-estimator", default=None, choices=["video", "mono"])
     ap.add_argument("--fill-method", default=None,
                     choices=["none", "nearest", "bilinear", "edge_aware", "inpaint"])
     args = ap.parse_args()
@@ -78,6 +80,9 @@ def main() -> None:
     gm = wm["gripper_mask"]
     warp = wm.get("warp", {})
     gwc = wm.get("genwarp", {})
+    mvc = wm.get("mvgen", {})
+    dep = wm.get("depth", {})
+    tp = wm.get("thirdperson", {})
     fr = args.frames if args.frames is not None else wm.get("frame_range")
 
     wmc = WorldModelConfig(
@@ -100,14 +105,30 @@ def main() -> None:
         kernel_splat=bool(warp.get("kernel_splat", True)),
         inpaint_holes=bool(warp.get("inpaint_holes", True)),
         fill_method=args.fill_method or warp.get("fill_method", "inpaint"),
+        depth_estimator=args.depth_estimator or dep.get("estimator", "video"),
+        depth_encoder=dep.get("encoder", "vits"),
         wrist_renderer=args.wrist_renderer or wm.get("wrist_renderer", "depthwarp"),
         genwarp_mode=gwc.get("mode", "pad"),
         genwarp_depth_scale=float(gwc.get("depth_scale", 1.0)),
         genwarp_steps=int(gwc.get("num_inference_steps", 20)),
         genwarp_guidance=float(gwc.get("guidance_scale", 3.5)),
+        mvgen_ref_depth=mvc.get("ref_depth", "dust3r"),
+        mvgen_chunk=int(mvc.get("chunk", 6)),
+        mvgen_refs=int(mvc.get("refs", 3)),
+        mvgen_use_zed=bool(mvc.get("use_zed_ref", False)),
+        mvgen_steps=int(mvc.get("num_inference_steps", 50)),
+        mvgen_guidance=float(mvc.get("guidance_scale", 2.0)),
+        mvgen_depth_scale=float(mvc.get("depth_scale", 1.0)),
+        mvgen_min_baseline=float(mvc.get("min_baseline", 0.06)),
+        mvgen_max_align_loss=float(mvc.get("max_align_loss", 0.02)),
+        mvgen_ref_select=mvc.get("ref_select", "hybrid"),
+        mvgen_rot_weight=float(mvc.get("rot_weight", 0.1)),
+        mvgen_near_refs=int(mvc.get("near_refs", 2)),
         frame_range=tuple(fr) if fr else None,
         render_wrist=wm.get("render_wrist", True) and not args.no_wrist,
         render_zed=wm.get("render_zed", True) and not args.no_zed,
+        scene_depth_npz=_abs(root, tp["scene_depth_npz"]) if tp.get("scene_depth_npz") else None,
+        depth_margin=float(tp.get("depth_margin", 0.12)),
     )
 
     out = SyntheticEpisodePipeline(wmc).run()

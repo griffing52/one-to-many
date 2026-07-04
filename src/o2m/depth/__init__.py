@@ -7,6 +7,7 @@ initialise its Gaussians from that. This fixes geometry on low-texture surfaces
 (blank walls) that pure photometric SfM/splatting leaves under-constrained.
 """
 from .mono import MonoDepthEstimator
+from .video import VideoDepthEstimator
 from .dense_init import build_dense_seed_cloud
 
-__all__ = ["MonoDepthEstimator", "build_dense_seed_cloud"]
+__all__ = ["MonoDepthEstimator", "VideoDepthEstimator", "build_dense_seed_cloud"]

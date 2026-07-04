@@ -6,6 +6,8 @@ and third-person (URDF robot over the ZED clean plate) views, writing the result
 back in the input dataset format. See ``docs/worldmodel.md`` and
 ``configs/worldmodel.yaml``.
 """
+from .mvgen_warp import (MVGenWrapper, crop_to_aspect, offset_target_c2w,
+                         wrist_c2w)
 from .perturb import (PerturbationSpec, PerturbedTrajectory, check_feasibility,
                       detect_grasp_frame, offset_envelope, perturb_trajectory)
 from .pipeline import SyntheticEpisodePipeline, WorldModelConfig
@@ -22,4 +24,5 @@ __all__ = [
     "ThirdPersonRenderer", "load_zed_camera",
     "GripperMask", "WristIntrinsics", "WristWarper", "FILL_METHODS",
     "base_offset_to_camera", "disparity_to_depth", "fill_holes",
+    "MVGenWrapper", "crop_to_aspect", "offset_target_c2w", "wrist_c2w",
 ]

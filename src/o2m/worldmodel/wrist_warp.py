@@ -63,6 +63,15 @@ def disparity_to_depth(disp: np.ndarray) -> np.ndarray:
     return d * (0.5 / np.median(d))
 
 
+def disparities_to_depths(disps: np.ndarray) -> np.ndarray:
+    """Video-Depth-Anything disparity stack (N,H,W) -> depths with ONE global
+    shift/scale. The stack is already temporally consistent; normalising each
+    frame separately (as :func:`disparity_to_depth` does) would reintroduce the
+    per-frame scale flicker the video model removes."""
+    d = 1.0 / (disps - disps.min() + 0.3)
+    return d * (0.5 / np.median(d))
+
+
 # Hole-fill strategies for the disocclusion gaps left by forward warping. All take
 # the scattered image and a boolean ``filled`` mask (True where a pixel got a value)
 # and return the completed image. Pick via ``WristWarper(fill_method=...)`` or
@@ -117,12 +126,14 @@ class WristWarper:
         # Back-compat: inpaint_holes=False forces no fill regardless of fill_method.
         self.fill_method = fill_method if inpaint_holes else "none"
 
-    def scatter(self, real_rgb: np.ndarray, depth: np.ndarray, dcam: np.ndarray):
+    def scatter(self, real_rgb: np.ndarray, depth: np.ndarray, dcam: np.ndarray,
+                gmask: np.ndarray = None):
         """Forward-warp only: returns (scattered rgb, filled bool mask). No fill/gripper."""
-        return self._scatter(real_rgb, depth, dcam)
+        return self._scatter(real_rgb, depth, dcam, exclude=gmask)
 
     def warp(self, real_rgb: np.ndarray, depth: np.ndarray,
-             dcam: np.ndarray, fill_method: str = None) -> np.ndarray:
+             dcam: np.ndarray, fill_method: str = None,
+             gmask: np.ndarray = None) -> np.ndarray:
         """Warp ``real_rgb`` as if the camera moved by ``dcam`` (optical frame).
 
         Args:
@@ -130,15 +141,20 @@ class WristWarper:
             depth: HxW positive depth (from :func:`disparity_to_depth`).
             dcam: (3,) optical-frame camera translation (m).
             fill_method: override the instance hole-fill strategy for this call.
+            gmask: per-frame gripper mask (e.g. TemporalGripperMasker) overriding
+                the static trapezoid. Masked pixels are EXCLUDED from the warp
+                (they are camera-rigid; warping them at near depth sprays) and
+                pasted back from the original frame.
         """
-        out, filled = self._scatter(real_rgb, depth, dcam)
-        out = fill_holes(out, filled, fill_method or self.fill_method)
+        gm = gmask if gmask is not None else self.gmask.mask(*depth.shape)
+        out, filled = self._scatter(real_rgb, depth, dcam, exclude=gm)
+        out = fill_holes(out, filled | gm, fill_method or self.fill_method)
         # Keep the gripper exactly where it was in the original frame.
-        gm = self.gmask.mask(*depth.shape)
         out[gm] = real_rgb[gm]
         return out
 
-    def _scatter(self, real_rgb: np.ndarray, depth: np.ndarray, dcam: np.ndarray):
+    def _scatter(self, real_rgb: np.ndarray, depth: np.ndarray, dcam: np.ndarray,
+                 exclude: np.ndarray = None):
         intr = self.intr
         h, w = depth.shape
         ys, xs = np.mgrid[0:h, 0:w]
@@ -148,6 +164,8 @@ class WristWarper:
         # Move the virtual camera by +dcam => points shift by -dcam in its frame.
         xc2, yc2, zc2 = xc - dcam[0], yc - dcam[1], z - dcam[2]
         valid = zc2 > 1e-3
+        if exclude is not None:
+            valid &= ~exclude
         u = (xc2 / np.where(valid, zc2, 1.0) * intr.fx + intr.cx)
         v = (yc2 / np.where(valid, zc2, 1.0) * intr.fy + intr.cy)
 

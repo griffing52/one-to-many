@@ -30,15 +30,29 @@ def load_zed_camera(npz_path: str | Path) -> Camera:
 
 
 class ThirdPersonRenderer:
-    """Composite the Piper arm (at given joints) over the ZED clean plate."""
+    """Composite the Piper arm (at given joints) over the ZED clean plate.
 
-    def __init__(self, robot_renderer, camera: Camera, clean_plate: np.ndarray):
+    With ``scene_depth`` (metric plate depth from ``scripts/10_zed_metric_scene.py``)
+    the composite is DEPTH-ORDERED: scene geometry nearer than the rendered arm
+    (by more than ``depth_margin``, which absorbs the ~0.1 m metric-depth error)
+    hides it — e.g. the arm passing behind the rack.
+    """
+
+    def __init__(self, robot_renderer, camera: Camera, clean_plate: np.ndarray,
+                 scene_depth: np.ndarray | None = None, depth_margin: float = 0.12):
         self.renderer = robot_renderer
         self.camera = camera
         self.plate = clean_plate
+        self.scene_depth = scene_depth
+        self.depth_margin = depth_margin
 
     def render(self, q: np.ndarray) -> np.ndarray:
         """One RGB frame: arm at joints ``q`` over the clean plate."""
         from ..render.composite import composite_rgba_over
-        fg, alpha, _ = self.renderer.render_rgba(q, self.camera)
-        return composite_rgba_over(self.plate, fg, alpha)
+        fg, alpha, fg_depth = self.renderer.render_rgba(q, self.camera)
+        if self.scene_depth is None:
+            return composite_rgba_over(self.plate, fg, alpha)
+        bg_depth = np.nan_to_num(self.scene_depth, nan=0.0)  # nan -> "far"
+        return composite_rgba_over(self.plate, fg, alpha,
+                                   fg_depth=fg_depth - self.depth_margin,
+                                   bg_depth=bg_depth)

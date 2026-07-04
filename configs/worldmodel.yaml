@@ -47,10 +47,21 @@ worldmodel:
     half_top: 0.05         # half-width at the top edge (fraction of image width)
     half_grow: 0.175       # extra half-width added by the bottom edge
 
+  # ---- wrist depth source ---------------------------------------------------
+  # video : Video-Depth-Anything over the whole frame sequence -> temporally
+  #         consistent depth (repo at a2l/video-depth-anything + checkpoint).
+  # mono  : old per-frame Depth-Anything-V2 (HF pipeline); flickers on video.
+  depth:
+    estimator: video
+    encoder: vits          # vits | vitb | vitl (video only; vitl = best, ~4GB ckpt)
+
   # ---- wrist renderer + warp quality --------------------------------------
   # depthwarp : reproject the real frame by depth (fast, real detail).
   # genwarp   : Sony GenWarp diffusion novel-view synthesis (clean disocclusions,
   #             needs a GPU + checkpoints; see docs/genwarp.md).
+  # mvgen     : MVGenMaster multi-view diffusion NVS conditioned on SEVERAL real
+  #             frames (+ optionally the ZED plate) with known FK cameras
+  #             (repo + checkpoints at a2l/MVGenMaster; see docs/mvgenmaster.md).
   wrist_renderer: depthwarp
   warp:
     kernel_splat: true     # 2x2 forward splat -> fewer pin-holes / less spray
@@ -68,6 +79,48 @@ worldmodel:
     depth_scale: 1.0       # <1 exaggerates the shift, >1 shrinks it (parallax ~ 1/depth)
     num_inference_steps: 20  # more -> cleaner, slower
     guidance_scale: 3.5    # higher -> follows the warp more (less drift)
+
+  # ---- MVGenMaster knobs (only used when wrist_renderer: mvgen) -------------
+  # Perturbed frames are generated in CHUNKS: each diffusion call conditions on
+  # `refs` real frames sampled across the chunk (+ the ZED clean plate when
+  # use_zed_ref) with known FK/calibrated cameras, and synthesizes the chunk's
+  # perturbed target poses in one pass. Compare conditioning strategies on one
+  # frame with scripts/12_mvgen_demo.py. See docs/mvgenmaster.md.
+  mvgen:
+    ref_depth: dust3r      # dust3r: metric ref depth (DUSt3R locked to FK poses,
+                           #         per chunk, recommended) | vda: reuse the
+                           #         Video-Depth-Anything depth (pseudo-metric)
+    chunk: 6               # perturbed frames per diffusion call
+    refs: 3                # real frames used as reference views per chunk
+    use_zed_ref: false     # add the ZED clean plate as an extra reference view
+    num_inference_steps: 50
+    guidance_scale: 2.0
+    depth_scale: 1.0       # ref-depth multiplier (vda depth only)
+    # dust3r conditioning health: widen the refs beyond the chunk until the FK
+    # baseline reaches min_baseline (static/slow segments break the preset-pose
+    # solve); if the alignment loss still exceeds max_align_loss (good ~0.001-
+    # 0.01, broken 0.5+), that chunk falls back to VDA depth re-anchored to the
+    # last well-aligned chunk's metric median.
+    min_baseline: 0.06     # ~ the strategy demo's known-good ref span
+    max_align_loss: 0.02
+    # spread : refs = evenly spaced frames across the baseline-widened chunk
+    # nearest: refs = real frames with poses CLOSEST to the perturbed targets
+    #          (minimal shift to synthesize; depth solved with spread aux frames)
+    # hybrid : global keyframes spread over the live trajectory (SAME for every
+    #          chunk -> consistent appearance across chunk boundaries) + per-chunk
+    #          nearest refs. Best video cohesion.
+    ref_select: hybrid
+    rot_weight: 0.1        # m-per-rad rotation term in the pose distance
+    near_refs: 2           # per-chunk nearest refs added in hybrid mode
+
+  # ---- third-person occlusion ----------------------------------------------
+  # Metric plate depth from scripts/10_zed_metric_scene.py. When present, the
+  # robot composite is DEPTH-ORDERED (arm hides behind nearer scene geometry,
+  # e.g. the rack). depth_margin absorbs the ~0.1m metric-depth error (the arm
+  # only hides when the scene is nearer by MORE than this).
+  thirdperson:
+    scene_depth_npz: ./outputs/episode_000/align/zed_scene_metric.npz
+    depth_margin: 0.12
 
   # ---- render toggles / range ---------------------------------------------
   render_wrist: true

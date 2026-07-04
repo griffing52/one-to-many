@@ -14,6 +14,7 @@ nav:
       - World model (design): worldmodel.md
       - Generate synthetic episodes: synthetic_data.md
       - Wrist synthesis — warp, inpaint & GenWarp: genwarp.md
+      - Wrist synthesis — MVGenMaster (multi-view): mvgenmaster.md
       - Stretch — dynamic objects: stretch_dynamic.md
   - Representations & extensibility: representations.md
   - Alignment (crux): alignment.md

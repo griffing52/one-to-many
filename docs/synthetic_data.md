@@ -20,7 +20,8 @@ recorded episode ──▶ perturb trajectory ──▶ IK feasibility (success/
 ```
 
 No Gaussian splat is trained: the **wrist** background is the real frame lifted to a
-monocular-depth (DA-v2) **point cloud** and reprojected, with disocclusions
+depth **point cloud** (Video-Depth-Anything over the sequence by default; per-frame
+DA-v2 as `depth.estimator: mono` fallback) and reprojected, with disocclusions
 **inpainted**; the **third-person** background is the real ZED frame with the robot
 **inpainted out** (the "clean plate"). See [Representations](representations.md) and
 [Wrist synthesis & GenWarp](genwarp.md) for the geometry and fill methods.
@@ -84,6 +85,16 @@ bottom-centre trapezoid.
 
 > **Width was halved** per request: `half_top 0.10 → 0.05`, `half_grow 0.35 → 0.175`.
 > To make it wider/narrower again, scale these two numbers.
+
+### Wrist depth source (`depth:`)
+- `estimator` — `video` *(default)*: **Video-Depth-Anything** over the whole frame
+  sequence → temporally consistent depth, normalised **once globally**
+  (`disparities_to_depths`). `mono`: the old per-frame DA-v2 HF pipeline with
+  per-frame median normalisation — flickers on video, kept as a fallback.
+  CLI override: `--depth-estimator {video,mono}`.
+- `encoder` — `vits | vitb | vitl` (video path only). Needs the repo at
+  `a2l/video-depth-anything` + `checkpoints/video_depth_anything_<encoder>.pth`
+  (`get_weights.sh`); `vits` is downloaded. Runs without xformers.
 
 ### Wrist renderer + warp quality (`wrist_renderer`, `warp:`)
 - `wrist_renderer` — `depthwarp` (fast, reprojects real pixels) or `genwarp`

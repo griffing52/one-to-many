@@ -39,8 +39,9 @@ RTX 5070 Ti; much more on weaker cards).
 
 ### Does it use the same depth/warp as the depth-warp path?
 
-**Depth: yes — identical.** GenWarp is fed the *same* `disparity_to_depth(DA-v2)`
-map and the *same* camera offset `dcam` as the depth-warp renderer. It does **not**
+**Depth: yes — identical.** GenWarp is fed the *same* depth map (Video-Depth-Anything
+by default, per-frame DA-v2 with `depth.estimator: mono` — see `configs/worldmodel.yaml`)
+and the *same* camera offset `dcam` as the depth-warp renderer. It does **not**
 estimate its own depth.
 
 **Warp: it forward-warps internally, and it must.** GenWarp's diffusion UNet is
